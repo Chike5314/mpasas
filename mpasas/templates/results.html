@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Results · {{ session.name }}{% endblock %}
+{% block page_title %}Results: {{ session.name }}{% endblock %}
+
+{% block content %}
+
+<!-- Top bar with export buttons -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <span class="text-muted">Template: <strong>{{ template.name if template else '—' }}</strong>
+    &nbsp;·&nbsp; {{ session.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{{ url_for('export_csv',   session_id=session.id) }}" class="btn btn-emerald">⬇️ Export CSV</a>
+    <a href="{{ url_for('export_excel', session_id=session.id) }}" class="btn btn-amber">⬇️ Export Excel</a>
+    <a href="{{ url_for('sessions_list') }}" class="btn btn-secondary">← Back</a>
+  </div>
+</div>
+
+<!-- Summary stat cards -->
+{% if summary %}
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+  <div class="stat-card primary">
+    <span class="stat-label">Students</span>
+    <span class="stat-value">{{ summary.n }}</span>
+    <span class="stat-sub">scripts graded</span>
+  </div>
+  <div class="stat-card emerald">
+    <span class="stat-label">Average Score</span>
+    <span class="stat-value">{{ summary.mean }}%</span>
+    <span class="stat-sub">median {{ summary.median }}%</span>
+  </div>
+  <div class="stat-card secondary">
+    <span class="stat-label">Pass Rate</span>
+    <span class="stat-value">{{ summary.pass_rate }}%</span>
+    <span class="stat-sub">{{ summary.pass_count }} passed</span>
+  </div>
+  <div class="stat-card red">
+    <span class="stat-label">Failed</span>
+    <span class="stat-value">{{ summary.fail_count }}</span>
+    <span class="stat-sub">below {{ session.passing_score }}%</span>
+  </div>
+  <div class="stat-card amber">
+    <span class="stat-label">Highest</span>
+    <span class="stat-value">{{ summary.max }}%</span>
+  </div>
+  <div class="stat-card cyan">
+    <span class="stat-label">Lowest</span>
+    <span class="stat-value">{{ summary.min }}%</span>
+    <span class="stat-sub">std dev {{ summary.std }}%</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Charts row -->
+{% if dist_chart %}
+<div class="charts-grid">
+  <div class="card">
+    <div class="card-header"><span class="card-title">📈 Score Distribution</span></div>
+    <div class="card-body" style="padding:12px;">
+      <img src="data:image/png;base64,{{ dist_chart }}" class="chart-img" alt="Score Distribution"/>
+    </div>
+  </div>
+  {% if diff_chart %}
+  <div class="card">
+    <div class="card-header"><span class="card-title">🎯 Question Difficulty</span></div>
+    <div class="card-body" style="padding:12px;">
+      <img src="data:image/png;base64,{{ diff_chart }}" class="chart-img" alt="Difficulty"/>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% if disc_chart %}
+<div class="card mb-20">
+  <div class="card-header"><span class="card-title">📐 Discrimination Index</span></div>
+  <div class="card-body" style="padding:12px;">
+    <img src="data:image/png;base64,{{ disc_chart }}" class="chart-img" alt="Discrimination"/>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Per-question analytics table -->
+{% if q_stats %}
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">🔬 Per-Question Analytics</span>
+    <span class="text-muted text-sm">{{ q_stats | length }} questions</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Question</th>
+          <th>Key</th>
+          <th>Correct</th>
+          <th>Difficulty (p)</th>
+          <th>Level</th>
+          <th>Discrimination (D)</th>
+          <th>Quality</th>
+          <th>Distractor spread</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for q in q_stats %}
+        <tr>
+          <td><strong>{{ q.question }}</strong></td>
+          <td><span class="badge badge-pass">{{ q.correct_answer }}</span></td>
+          <td>{{ q.total_correct }}/{{ summary.n }}</td>
+          <td>{{ q.difficulty_index }}</td>
+          <td><span class="badge badge-{{ q.difficulty_label | lower }}">{{ q.difficulty_label }}</span></td>
+          <td>{{ q.discrimination_index }}</td>
+          <td><span class="badge badge-{{ q.discrimination_label | lower }}">{{ q.discrimination_label }}</span></td>
+          <td>
+            <span style="font-size:11px;color:var(--muted);">
+              {% for opt, cnt in q.distractors.items() %}
+                <strong style="color:{{ 'var(--emerald)' if opt == q.correct_answer else 'var(--text)' }}">{{ opt }}</strong>:{{ cnt }}
+                {% if not loop.last %}&nbsp;·&nbsp;{% endif %}
+              {% endfor %}
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Student results table -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">👥 Individual Results</span>
+    <span class="text-muted text-sm">{{ results | length }} students</span>
+  </div>
+
+  <!-- Search bar -->
+  <div style="padding:12px 20px;border-bottom:1px solid var(--border);">
+    <input class="form-input" id="searchInput" placeholder="🔍 Search by student name…"
+           oninput="filterTable()" style="max-width:320px;"/>
+  </div>
+
+  <div class="table-wrap">
+    <table id="resultsTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Student</th>
+          <th>Score</th>
+          <th>Percentage</th>
+          <th>Result</th>
+          <th>Alignment</th>
+          <th>Answers →</th>
+          <th>View</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in results %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ r.student_name }}</strong></td>
+          <td>{{ r.score|int }}/{{ r.total }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="progress-bar-wrap" style="width:60px;">
+                <div class="progress-bar-fill" style="width:{{ r.percentage }}%;
+                  background:{{ 'var(--emerald)' if r.percentage >= session.passing_score else 'var(--red)' }};"></div>
+              </div>
+              <strong style="color:{{ 'var(--emerald)' if r.percentage >= session.passing_score else 'var(--red)' }};">
+                {{ r.percentage | round(1) }}%
+              </strong>
+            </div>
+          </td>
+          <td>
+            <span class="badge {{ 'badge-pass' if r.passed else 'badge-fail' }}">
+              {{ 'PASS' if r.passed else 'FAIL' }}
+            </span>
+          </td>
+          <td>
+            <span class="text-muted text-sm" title="{{ r.alignment_note }}">
+              {{ r.alignment_note[:30] }}{% if r.alignment_note|length > 30 %}…{% endif %}
+            </span>
+          </td>
+          <td style="font-size:11px;max-width:280px;white-space:nowrap;overflow:hidden;">
+            {% for q, ans in r.raw_answers.items() %}
+              <span title="{{ q }}: {{ ans or 'blank' }}" style="margin-right:3px;">
+                {% if ans %}
+                  {% if template and template.answer_key.get(q) == ans %}
+                    <span class="ans-correct">{{ ans }}</span>
+                  {% else %}
+                    <span class="ans-wrong">{{ ans }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="ans-blank">_</span>
+                {% endif %}
+              </span>
+            {% endfor %}
+          </td>
+          <td>
+            <div style="display:flex;gap:5px;">
+              <a href="{{ url_for('view_marked_script', session_id=session.id, result_id=r.id) }}"
+                 class="btn btn-primary btn-sm" title="View annotated answer sheet">
+                📸 Script
+              </a>
+              <a href="{{ url_for('view_student_report', session_id=session.id, result_id=r.id) }}"
+                 class="btn btn-secondary btn-sm" title="Detailed score report">
+                📋 Report
+              </a>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#resultsTable tbody tr').forEach(row => {
+    row.style.display = row.cells[1].textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

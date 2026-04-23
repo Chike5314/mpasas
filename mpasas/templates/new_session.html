@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Grade Scripts{% endblock %}
+{% block page_title %}Grade a Batch of Scripts{% endblock %}
+
+{% block content %}
+{% if not templates %}
+<div class="empty-state">
+  <span class="empty-state-icon">⚠️</span>
+  <h3>No templates available</h3>
+  <p>You need at least one calibrated template before grading. Create one first.</p>
+  <a href="{{ url_for('new_template') }}" class="btn btn-primary">Create Template</a>
+</div>
+{% else %}
+<div style="max-width:700px;">
+
+  <div class="card mb-20" style="border-left:4px solid var(--primary);">
+    <div class="card-body" style="padding:16px 20px;">
+      <div style="font-weight:700;margin-bottom:6px;">📌 Before you start</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+        Upload photos of <strong>one answer sheet per image</strong>.
+        Photos can be taken at an angle — the CV engine will straighten them.
+        Make sure you've already set the <strong>answer key</strong> on your template.
+      </div>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" id="gradeForm">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">📋 Session Setup</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Session Name *</label>
+          <input class="form-input" type="text" name="name"
+                 placeholder="e.g. BIO 201 Mid-Term – Nov 2025" required autofocus/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Answer-Sheet Template *</label>
+            <select class="form-select" name="template_id" id="templateSelect" required>
+              <option value="">— Select template —</option>
+              {% for t in templates %}
+              <option value="{{ t.id }}"
+                {{ 'selected' if request.args.get('template_id')|int == t.id else '' }}>
+                {{ t.name }} ({{ t.total_questions }} Qs)
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Passing Score (%)</label>
+            <input class="form-input" type="number" name="passing_score"
+                   min="0" max="100" value="50" step="1"/>
+            <div class="form-hint">Students at or above this % are marked PASS.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">🖼️ Upload Student Scripts</span></div>
+      <div class="card-body">
+        <div class="dropzone" id="scriptDropzone" onclick="document.getElementById('scriptFiles').click()">
+          <span class="dropzone-icon">📸</span>
+          <p><strong>Click to select</strong> or drag &amp; drop script images</p>
+          <p>JPG, PNG, WEBP &nbsp;·&nbsp; Multiple files supported</p>
+          <p id="fileCount" style="margin-top:10px;font-weight:700;color:var(--primary);font-size:15px;"></p>
+        </div>
+        <input type="file" id="scriptFiles" name="scripts" multiple
+               accept=".jpg,.jpeg,.png,.webp,.bmp" style="display:none"/>
+
+        <div id="previewGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:14px;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+        🚀 Start Grading
+      </button>
+      <a href="{{ url_for('sessions_list') }}" class="btn btn-secondary btn-lg">Cancel</a>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loadingState" style="display:none;margin-top:20px;">
+      <div class="card" style="border-left:4px solid var(--primary);">
+        <div class="card-body">
+          <div style="font-weight:700;margin-bottom:10px;">⏳ Processing scripts…</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progBar" style="width:100%;animation:pulse 1.2s ease-in-out infinite;"></div>
+          </div>
+          <div class="text-muted" style="margin-top:8px;font-size:13px;">
+            Running ORB alignment + pixel density extraction. This may take a moment for large batches.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </form>
+</div>
+{% endif %}
+
+<style>
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+</style>
+
+<script>
+const input = document.getElementById('scriptFiles');
+const dropzone = document.getElementById('scriptDropzone');
+const fileCount = document.getElementById('fileCount');
+const previewGrid = document.getElementById('previewGrid');
+
+input.addEventListener('change', updatePreviews);
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  const dt = new DataTransfer();
+  Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+  input.files = dt.files;
+  updatePreviews();
+});
+
+function updatePreviews() {
+  const files = Array.from(input.files);
+  fileCount.textContent = files.length
+    ? `${files.length} file${files.length > 1 ? 's' : ''} selected`
+    : '';
+  previewGrid.innerHTML = '';
+  files.slice(0, 20).forEach(f => {
+    const url = URL.createObjectURL(f);
+    const div = document.createElement('div');
+    div.style.cssText = 'border-radius:8px;overflow:hidden;border:1px solid var(--border);';
+    div.innerHTML = `<img src="${url}" style="width:100%;height:80px;object-fit:cover;" title="${f.name}"/>
+                     <div style="padding:4px;font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${f.name}</div>`;
+    previewGrid.appendChild(div);
+  });
+  if (files.length > 20) {
+    const more = document.createElement('div');
+    more.style.cssText = 'display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--bg);border:1px solid var(--border);font-size:12px;color:var(--muted);height:90px;';
+    more.textContent = `+${files.length - 20} more`;
+    previewGrid.appendChild(more);
+  }
+}
+
+document.getElementById('gradeForm').addEventListener('submit', () => {
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').textContent = 'Processing…';
+  document.getElementById('loadingState').style.display = 'block';
+});
+</script>
+{% endblock %}

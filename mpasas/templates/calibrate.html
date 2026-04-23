@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+{% block title %}Calibrate · {{ template.name }}{% endblock %}
+{% block page_title %}Calibrate: {{ template.name }}{% endblock %}
+
+{% block head %}
+<style>
+.toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.tool-btn {
+  padding:6px 14px; font-size:12px; font-weight:700;
+  border:2px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--card); cursor:pointer; transition:all .15s;
+}
+.tool-btn:hover { border-color:var(--primary); color:var(--primary); }
+.tool-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+.tool-btn.omr-btn.active { background:var(--secondary); border-color:var(--secondary); }
+.tool-btn.text-btn.active { background:var(--cyan); border-color:var(--cyan); }
+#canvasWrap { position:relative; display:inline-block; }
+#overlay { position:absolute; top:0; left:0; pointer-events:none; }
+.key-tabs { display:flex; gap:4px; margin-bottom:12px; }
+.key-tab { padding:6px 14px; font-size:12px; font-weight:700; border:2px solid var(--border);
+           border-radius:var(--radius-sm); background:var(--bg); cursor:pointer; }
+.key-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="steps mb-28">
+  <div class="step done"><span class="step-num">✓</span> Create</div>
+  <div class="step active"><span class="step-num">2</span> Calibrate Zones</div>
+  <div class="step"><span class="step-num">3</span> Answer Key</div>
+  <div class="step"><span class="step-num">4</span> Save</div>
+</div>
+
+<form id="calibForm" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="zones_json" id="zones_json" value="{{ zones_json }}"/>
+  <input type="hidden" name="answer_key_json" id="answer_key_json" value="{{ answer_key_json }}"/>
+
+  <div class="calibrator-wrap">
+
+    <!-- ── Left: Canvas ─────────────────────────── -->
+    <div style="flex:1;min-width:0;">
+
+      <!-- Image upload (if none yet) -->
+      {% if not img_url %}
+      <div class="card mb-12">
+        <div class="card-body">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Upload Blank Template Image</label>
+            <div class="dropzone" id="dropzone2" onclick="document.getElementById('tmplFile').click()">
+              <span class="dropzone-icon">🖼️</span>
+              <p><strong>Click to upload</strong> your blank answer sheet</p>
+              <p id="fn2"></p>
+            </div>
+            <input type="file" id="tmplFile" name="template_image"
+                   accept=".jpg,.jpeg,.png,.webp,.bmp" style="display:none"/>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <button type="button" class="tool-btn omr-btn" id="btnOMR" onclick="setTool('omr')">🔵 Draw OMR Zone</button>
+        <button type="button" class="tool-btn text-btn" id="btnTEXT" onclick="setTool('text')">🔤 Draw Name Zone</button>
+        <button type="button" class="tool-btn" onclick="undoLast()" style="margin-left:auto;">↩️ Undo</button>
+        <button type="button" class="tool-btn" onclick="clearAll()" style="color:var(--red);">🗑️ Clear All</button>
+      </div>
+
+      <!-- Canvas area -->
+      <div class="canvas-container">
+        <div id="canvasWrap">
+          {% if img_url %}
+          <img id="templateImg" src="{{ img_url }}"
+               style="max-width:100%;display:block;" onload="initCanvas(this)"/>
+          <canvas id="calibratorCanvas"></canvas>
+          <canvas id="overlay"></canvas>
+          {% else %}
+          <div style="padding:80px;text-align:center;color:var(--muted);">
+            <span style="font-size:56px;">📄</span><br>
+            Upload an image above to start drawing zones.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if img_url %}
+      <div class="text-muted" style="margin-top:8px;font-size:12px;">
+        Click and drag to draw a zone. OMR zones are purple, Name zones are cyan.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Right: Zone List + Answer Key ─────── -->
+    <div class="calibrator-sidebar">
+
+      <div class="card mb-12">
+        <div class="card-header">
+          <span class="card-title">📐 Zones</span>
+          <span id="zoneCount" class="badge badge-pass">0</span>
+        </div>
+        <div class="card-body" style="padding:12px;">
+          <div id="zoneList">
+            <div class="text-muted text-sm">No zones drawn yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Answer Key section -->
+      <div class="card mb-12">
+        <div class="card-header">
+          <span class="card-title">🔑 Answer Key</span>
+          <div style="display:flex;gap:6px;">
+            <a href="{{ url_for('scan_answer_key', tid=template.id) }}"
+               class="btn btn-amber btn-sm" title="Scan key from a filled photo">📸 Scan Photo</a>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openKeyEditor()">✏️ Edit</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:12px;">
+          <div id="keyPreview" class="text-muted text-sm">Set answer key in the editor →</div>
+        </div>
+      </div>
+
+      <!-- Save -->
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitForm()">
+        💾 Save &amp; Continue
+      </button>
+      <a href="{{ url_for('templates_list') }}" class="btn btn-secondary"
+         style="width:100%;justify-content:center;margin-top:8px;">Cancel</a>
+    </div>
+  </div>
+</form>
+
+<!-- ── Zone Config Modal ──────────────────────────────── -->
+<div class="modal-overlay" id="zoneModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Configure Zone</h3>
+    <div class="form-group">
+      <label class="form-label">Zone Name</label>
+      <input class="form-input" id="zoneName" placeholder="e.g. Answers Block 1"/>
+    </div>
+    <div id="omrConfig">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Rows (questions)</label>
+          <input class="form-input" id="zoneRows" type="number" min="1" max="200" value="20"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Columns (options)</label>
+          <input class="form-input" id="zoneCols" type="number" min="2" max="10" value="5"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Option Labels (comma-separated)</label>
+        <input class="form-input" id="zoneLabels" placeholder="A,B,C,D,E" value="A,B,C,D,E"/>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="confirmZone()">✅ Confirm Zone</button>
+      <button class="btn btn-secondary" onclick="cancelZone()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Answer Key Editor Modal ───────────────────────── -->
+<div class="modal-overlay" id="keyModal">
+  <div class="modal-box" style="width:520px;max-height:90vh;overflow-y:auto;">
+    <h3>🔑 Set Answer Key</h3>
+    <div class="form-group">
+      <label class="form-label">Total Questions</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" id="totalQInput" type="number" min="1" max="300" value="20" style="width:100px;"/>
+        <select class="form-select" id="numOptsInput" style="width:130px;">
+          <option value="4">4 options (A-D)</option>
+          <option value="5" selected>5 options (A-E)</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="buildKeyGrid()">Build Grid</button>
+      </div>
+    </div>
+    <div id="keyGrid" class="answer-key-grid" style="margin-bottom:16px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="saveKey()">Save Key</button>
+      <button class="btn btn-secondary" onclick="closeKeyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let zones   = {{ zones_json | safe }};
+let answerKey = {};
+try { answerKey = JSON.parse({{ answer_key_json | tojson }}); } catch(e) { answerKey = {}; }
+
+let tool    = 'omr';
+let drawing = false;
+let startX  = 0, startY = 0;
+let pendingRect = null;
+let canvas, ctx, img, overlay, octx;
+const COLORS = { omr:'rgba(124,58,237,0.35)', text:'rgba(6,182,212,0.35)' };
+const STROKES = { omr:'#7C3AED', text:'#06B6D4' };
+
+// ── Init ───────────────────────────────────────────────────────────
+function initCanvas(imgEl) {
+  img     = imgEl;
+  canvas  = document.getElementById('calibratorCanvas');
+  overlay = document.getElementById('overlay');
+  resizeCanvases();
+  redraw();
+  attachMouseEvents();
+}
+
+function resizeCanvases() {
+  const r = img.getBoundingClientRect();
+  [canvas, overlay].forEach(c => {
+    c.width  = img.naturalWidth;
+    c.height = img.naturalHeight;
+    c.style.width  = img.clientWidth  + 'px';
+    c.style.height = img.clientHeight + 'px';
+    c.style.position = 'absolute';
+    c.style.top = '0'; c.style.left = '0';
+  });
+  ctx  = canvas.getContext('2d');
+  octx = overlay.getContext('2d');
+  overlay.style.pointerEvents = 'none';
+}
+
+function imgToCanvas(px, py) {
+  const scaleX = canvas.width  / img.clientWidth;
+  const scaleY = canvas.height / img.clientHeight;
+  return [px * scaleX, py * scaleY];
+}
+
+// ── Tools ──────────────────────────────────────────────────────────
+function setTool(t) {
+  tool = t;
+  document.getElementById('btnOMR').classList.toggle('active', t === 'omr');
+  document.getElementById('btnTEXT').classList.toggle('active', t === 'text');
+}
+
+// ── Mouse events ───────────────────────────────────────────────────
+function attachMouseEvents() {
+  overlay.style.pointerEvents = 'all';
+  overlay.style.cursor = 'crosshair';
+  overlay.addEventListener('mousedown', onDown);
+  overlay.addEventListener('mousemove', onMove);
+  overlay.addEventListener('mouseup',   onUp);
+  // Touch support
+  overlay.addEventListener('touchstart', e => { e.preventDefault(); onDown(e.touches[0]); }, {passive:false});
+  overlay.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0]); }, {passive:false});
+  overlay.addEventListener('touchend',   e => { e.preventDefault(); onUp(e.changedTouches[0]); }, {passive:false});
+}
+
+function relCoords(e) {
+  const rect = overlay.getBoundingClientRect();
+  return [(e.clientX - rect.left), (e.clientY - rect.top)];
+}
+
+function onDown(e) {
+  drawing = true;
+  [startX, startY] = relCoords(e);
+}
+
+function onMove(e) {
+  if (!drawing) return;
+  const [cx, cy] = relCoords(e);
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  const [sx, sy] = imgToCanvas(startX, startY);
+  const [ex, ey] = imgToCanvas(cx, cy);
+  octx.fillStyle   = COLORS[tool];
+  octx.strokeStyle = STROKES[tool];
+  octx.lineWidth   = 2;
+  octx.fillRect(sx, sy, ex - sx, ey - sy);
+  octx.strokeRect(sx, sy, ex - sx, ey - sy);
+}
+
+function onUp(e) {
+  if (!drawing) return;
+  drawing = false;
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  const [cx, cy] = relCoords(e);
+  const w = cx - startX, h = cy - startY;
+  if (Math.abs(w) < 10 || Math.abs(h) < 10) return;
+
+  // Normalise to percentages relative to image display size
+  const imgW = img.clientWidth, imgH = img.clientHeight;
+  pendingRect = {
+    xPct: Math.min(startX, cx) / imgW,
+    yPct: Math.min(startY, cy) / imgH,
+    wPct: Math.abs(w) / imgW,
+    hPct: Math.abs(h) / imgH,
+    type: tool,
+  };
+  openZoneModal();
+}
+
+// ── Zone Modal ────────────────────────────────────────────────────
+function openZoneModal() {
+  const isOMR = pendingRect.type === 'omr';
+  document.getElementById('modalTitle').textContent = isOMR ? '🔵 Configure OMR Zone' : '🔤 Configure Name Zone';
+  document.getElementById('omrConfig').style.display = isOMR ? 'block' : 'none';
+  document.getElementById('zoneName').value = isOMR ? 'Answers Block' : 'Student Name';
+  document.getElementById('zoneModal').classList.add('open');
+}
+
+function confirmZone() {
+  const zone = {
+    ...pendingRect,
+    name:   document.getElementById('zoneName').value || 'Zone',
+    rows:   parseInt(document.getElementById('zoneRows').value) || 20,
+    cols:   parseInt(document.getElementById('zoneCols').value) || 5,
+    labels: document.getElementById('zoneLabels').value.split(',').map(s => s.trim()),
+  };
+  if (zone.type === 'text') { delete zone.rows; delete zone.cols; }
+  zones.push(zone);
+  document.getElementById('zoneModal').classList.remove('open');
+  pendingRect = null;
+  redraw();
+  updateZoneList();
+  saveZonesInput();
+}
+
+function cancelZone() {
+  pendingRect = null;
+  document.getElementById('zoneModal').classList.remove('open');
+}
+
+// ── Redraw ────────────────────────────────────────────────────────
+function redraw() {
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  zones.forEach((z, i) => {
+    const x  = z.xPct * canvas.width;
+    const y  = z.yPct * canvas.height;
+    const w  = z.wPct * canvas.width;
+    const h  = z.hPct * canvas.height;
+    ctx.fillStyle   = COLORS[z.type] || COLORS.omr;
+    ctx.strokeStyle = STROKES[z.type] || STROKES.omr;
+    ctx.lineWidth   = 2;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    // Label
+    ctx.fillStyle = STROKES[z.type] || STROKES.omr;
+    ctx.font = `bold ${Math.max(10, Math.min(18, h * 0.12))}px Segoe UI,sans-serif`;
+    ctx.fillText((i + 1) + '. ' + z.name, x + 4, y + 16);
+  });
+}
+
+function undoLast() { zones.pop(); redraw(); updateZoneList(); saveZonesInput(); }
+function clearAll()  { zones = []; redraw(); updateZoneList(); saveZonesInput(); }
+
+function updateZoneList() {
+  const el = document.getElementById('zoneList');
+  document.getElementById('zoneCount').textContent = zones.length;
+  if (!zones.length) { el.innerHTML = '<div class="text-muted text-sm">No zones yet.</div>'; return; }
+  el.innerHTML = zones.map((z, i) => `
+    <div class="zone-item">
+      <span class="zone-type-badge zone-type-${z.type}">${z.type.toUpperCase()}</span>
+      <div class="zone-info">
+        <strong>${i+1}. ${z.name}</strong>
+        <small>${z.type==='omr' ? z.rows+'×'+z.cols+' grid' : 'Name / Text field'}</small>
+      </div>
+      <button type="button" onclick="removeZone(${i})"
+              style="background:none;border:none;cursor:pointer;color:var(--red);font-size:16px;">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeZone(i) { zones.splice(i, 1); redraw(); updateZoneList(); saveZonesInput(); }
+
+function saveZonesInput() {
+  document.getElementById('zones_json').value = JSON.stringify(zones);
+}
+
+// ── Answer Key Editor ─────────────────────────────────────────────
+let keyData = { ...answerKey };
+
+function openKeyEditor() {
+  buildKeyGrid();
+  document.getElementById('keyModal').classList.add('open');
+}
+function closeKeyModal() {
+  document.getElementById('keyModal').classList.remove('open');
+}
+
+function buildKeyGrid() {
+  const total = parseInt(document.getElementById('totalQInput').value) || 20;
+  const opts  = parseInt(document.getElementById('numOptsInput').value) || 5;
+  const labels = ['A','B','C','D','E','F'].slice(0, opts);
+  let html = '';
+  for (let i = 1; i <= total; i++) {
+    const q = 'Q' + i;
+    html += `<div class="answer-key-row"><label>${q}</label>`;
+    labels.forEach(l => {
+      const sel = keyData[q] === l ? 'selected' : '';
+      html += `<button type="button" class="answer-btn ${sel}"
+                       onclick="selectAnswer('${q}','${l}',this)">${l}</button>`;
+    });
+    html += '</div>';
+  }
+  document.getElementById('keyGrid').innerHTML = html;
+}
+
+function selectAnswer(q, label, btn) {
+  keyData[q] = label;
+  btn.closest('.answer-key-row').querySelectorAll('.answer-btn')
+     .forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function saveKey() {
+  answerKey = { ...keyData };
+  document.getElementById('answer_key_json').value = JSON.stringify(answerKey);
+  const count = Object.keys(answerKey).length;
+  document.getElementById('keyPreview').textContent =
+    count ? `${count} questions keyed ✅` : 'No answers set yet.';
+  document.getElementById('keyPreview').style.color = count ? 'var(--emerald)' : '';
+  closeKeyModal();
+}
+
+function submitForm() {
+  saveZonesInput();
+  document.getElementById('answer_key_json').value = JSON.stringify(answerKey);
+}
+
+// ── Init on load ──────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  updateZoneList();
+  const existingImg = document.getElementById('templateImg');
+  if (existingImg && existingImg.complete) initCanvas(existingImg);
+
+  // File upload preview
+  const fi = document.getElementById('tmplFile');
+  if (fi) fi.addEventListener('change', () => {
+    if (fi.files[0]) document.getElementById('fn2').textContent = '✅ ' + fi.files[0].name;
+  });
+
+  // Restore key preview
+  const cnt = Object.keys(answerKey).length;
+  if (cnt) {
+    document.getElementById('keyPreview').textContent = `${cnt} questions keyed ✅`;
+    document.getElementById('keyPreview').style.color = 'var(--emerald)';
+    // Restore keyData
+    keyData = { ...answerKey };
+  }
+});
+
+window.addEventListener('resize', () => {
+  if (img && canvas) { resizeCanvases(); redraw(); }
+});
+</script>
+{% endblock %}

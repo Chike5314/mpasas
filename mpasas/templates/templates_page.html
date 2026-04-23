@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Templates{% endblock %}
+{% block page_title %}Answer-Sheet Templates{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;">
+  <div>
+    <h2 style="font-size:20px;font-weight:800;">My Templates</h2>
+    <p class="text-muted">Each template represents one answer-sheet layout with calibrated zones.</p>
+  </div>
+  <a href="{{ url_for('new_template') }}" class="btn btn-primary">➕ New Template</a>
+</div>
+
+{% if templates %}
+<div class="template-grid">
+  {% for t in templates %}
+  <div class="template-card">
+    <div class="template-card-img">
+      {% if t.image_path %}
+        <img src="{{ url_for('serve_upload', folder='templates', filename=t.image_path.split('/')[-1]) }}"
+             style="width:100%;height:130px;object-fit:cover;" alt="template"/>
+      {% else %}
+        📄
+      {% endif %}
+    </div>
+    <div class="template-card-body">
+      <div class="template-card-name">{{ t.name }}</div>
+      <div class="template-card-meta">
+        {{ t.total_questions }} questions &nbsp;·&nbsp;
+        {{ t.zones | length }} zones &nbsp;·&nbsp;
+        {{ t.sessions | length }} session(s)
+      </div>
+      {% if t.description %}
+        <div class="text-muted" style="margin-top:6px;font-size:12px;">{{ t.description[:80] }}{% if t.description|length > 80 %}…{% endif %}</div>
+      {% endif %}
+      <div class="template-card-actions">
+        <a href="{{ url_for('calibrate', template_id=t.id) }}" class="btn btn-primary btn-sm" style="flex:1;justify-content:center;">✏️ Edit Zones</a>
+        <a href="{{ url_for('new_session') }}?template_id={{ t.id }}" class="btn btn-emerald btn-sm" style="flex:1;justify-content:center;">🚀 Grade</a>
+        <form method="post" action="{{ url_for('delete_template', template_id=t.id) }}"
+              onsubmit="return confirm('Delete template {{ t.name|e }}?')">
+          <button class="btn btn-red btn-sm" type="submit">🗑️</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <span class="empty-state-icon">📄</span>
+  <h3>No templates yet</h3>
+  <p>Upload a blank answer sheet and calibrate the zones to get started.</p>
+  <a href="{{ url_for('new_template') }}" class="btn btn-primary">Create First Template</a>
+</div>
+{% endif %}
+{% endblock %}
