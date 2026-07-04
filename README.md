@@ -1,4 +1,4 @@
-# MPASAS 🎓
+ # MPASAS 🎓
 ### MCQ Paper-based Automatic Scoring and Analytics System
 
 > **"Grade Smarter. Evaluate Better."**
@@ -53,7 +53,7 @@ Then open your browser at: **http://localhost:5000**
 ## Generate Demo / Test Data (no real scanner needed)
 
 ```bash
-python tests/generate_test_sheet.py
+python tests/generate_test_sheet.pypython tests/generate_test_sheet.py
 ```
 
 This creates:

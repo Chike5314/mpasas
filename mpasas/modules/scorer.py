@@ -5,6 +5,12 @@ Compares extracted student answers against the answer key.
 from typing import Dict, Optional, Tuple
 
 
+def _normalise_answer(value: Optional[str]) -> str:
+    if value is None:
+        return ''
+    return str(value).strip().upper()
+
+
 def score(
     student_answers: Dict[str, Optional[str]],
     answer_key: Dict[str, str],
@@ -28,8 +34,9 @@ def score(
 
     for q, correct_ans in answer_key.items():
         student_ans = student_answers.get(q)
-        is_correct  = (student_ans is not None and
-                       student_ans.strip().upper() == correct_ans.strip().upper())
+        student_norm = _normalise_answer(student_ans)
+        key_norm = _normalise_answer(correct_ans)
+        is_correct = bool(student_norm and student_norm == key_norm)
         if is_correct:
             correct += 1
         breakdown[q] = {

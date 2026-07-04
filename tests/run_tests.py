@@ -199,6 +199,20 @@ def t_extractor_blank():
     assert all(r['status'] == 'blank' for r in result.values())
     return f"{len(result)} blank questions detected"
 
+@test("Extractor: ambiguous multi-marks are not auto-graded")
+def t_extractor_ambiguous():
+    import numpy as np, cv2
+    from modules.extractor import extract_all_answers
+    roi = np.ones((120, 200, 3), dtype=np.uint8) * 240
+    cv2.circle(roi, (50, 60), 12, (20, 20, 20), -1)
+    cv2.circle(roi, (150, 60), 12, (20, 20, 20), -1)
+    zones = [{'type': 'omr', 'rows': 1, 'cols': 2, 'labels': ['A', 'B'],
+              'xPct': 0.0, 'yPct': 0.0, 'wPct': 1.0, 'hPct': 1.0}]
+    result = extract_all_answers(roi, zones)
+    assert result['answers']['Q1'] is None
+    assert result['metadata']['Q1']['status'] == 'ambiguous'
+    return "ambiguous marks were left ungraded"
+
 # ══════════════════════════════════════════════════════════════════
 #   Aligner
 # ══════════════════════════════════════════════════════════════════

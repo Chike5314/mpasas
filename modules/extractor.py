@@ -27,18 +27,12 @@ def _binarise(roi: np.ndarray) -> np.ndarray:
     if len(roi.shape) == 3:
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     else:
-        gray = roi.copy()
+        gray = roi.astype(np.uint8, copy=False)
 
-    # CLAHE then adaptive threshold
-    clahe   = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-    eq      = clahe.apply(gray)
-    blurred = cv2.GaussianBlur(eq, (5, 5), 0)
-    binary  = cv2.adaptiveThreshold(
-        blurred, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV,
-        blockSize=25, C=6,
-    )
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    eq = clahe.apply(gray)
+    _, binary = cv2.threshold(eq, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     return binary
 
 
@@ -89,7 +83,6 @@ def analyse_grid(
 
             cell = binary[y1:y2, x1:x2]
 
-            # Inset by ~8% to ignore printed grid lines / box borders
             margin_y = max(2, int((y2 - y1) * 0.08))
             margin_x = max(2, int((x2 - x1) * 0.08))
             inner = cell[margin_y:-margin_y, margin_x:-margin_x]
@@ -101,36 +94,45 @@ def analyse_grid(
             ratio = float(np.sum(inner > 127)) / float(inner.size)
             fill_ratios.append(round(ratio, 4))
 
-        max_r = max(fill_ratios) if fill_ratios else 0.0
-
-        if max_r < fill_threshold:
+        if not fill_ratios:
             results[q_num] = {
-                'answer':      None,
-                'confidence':  0.0,
-                'fill_ratios': fill_ratios,
-                'status':      'blank',
+                'answer': None,
+                'confidence': 0.0,
+                'fill_ratios': [],
+                'status': 'blank',
             }
             continue
 
-        # How many options are 'significantly' marked?
-        threshold_for_multi = fill_threshold * 0.55
-        marked_cols = [i for i, rat in enumerate(fill_ratios) if rat >= threshold_for_multi]
+        max_r = max(fill_ratios)
+        second_r = sorted(fill_ratios)[-2] if len(fill_ratios) > 1 else 0.0
+        marked_cols = [i for i, rat in enumerate(fill_ratios) if rat >= fill_threshold]
 
-        best_col = fill_ratios.index(max_r)
-        label    = labels[best_col] if best_col < len(labels) else str(best_col + 1)
+        if max_r < fill_threshold:
+            results[q_num] = {
+                'answer': None,
+                'confidence': 0.0,
+                'fill_ratios': fill_ratios,
+                'status': 'blank',
+            }
+            continue
 
-        if len(marked_cols) > 1:
-            status     = 'ambiguous'
+        best_col = int(np.argmax(fill_ratios))
+        label = labels[best_col] if best_col < len(labels) else str(best_col + 1)
+
+        if len(marked_cols) > 1 and (max_r - second_r) < 0.08:
+            status = 'ambiguous'
             confidence = max_r / (sum(fill_ratios) + 1e-9)
+            answer = None
         else:
-            status     = 'ok'
+            status = 'ok'
             confidence = max_r
+            answer = label
 
         results[q_num] = {
-            'answer':      label,
-            'confidence':  round(confidence, 4),
+            'answer': answer,
+            'confidence': round(confidence, 4),
             'fill_ratios': fill_ratios,
-            'status':      status,
+            'status': status,
         }
 
     return results
