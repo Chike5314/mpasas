@@ -8,7 +8,7 @@
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
   <div>
     <span class="text-muted">Template: <strong>{{ template.name if template else '—' }}</strong>
-    &nbsp;·&nbsp; {{ session.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+    &nbsp;·&nbsp; {{ session.created_at | format_datetime }}</span>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <a href="{{ url_for('export_csv',   session_id=session.id) }}" class="btn btn-emerald">⬇️ Export CSV</a>

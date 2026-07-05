@@ -30,6 +30,21 @@ def create_app():
 
     db.init_db(os.path.join(app.root_path, 'instance', 'mpasas.db'))
 
+    # ── Custom Jinja2 filters ─────────────────────────────────────
+    @app.template_filter('format_datetime')
+    def format_datetime_filter(date_str):
+        """Convert ISO string datetime to readable format: 'DD Mon YYYY, HH:MM'"""
+        if not date_str:
+            return '—'
+        try:
+            if isinstance(date_str, str):
+                dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            else:
+                dt = date_str
+            return dt.strftime('%d %b %Y, %H:%M')
+        except Exception:
+            return str(date_str)[:16]  # fallback: show first 16 chars
+
     # ── helpers ───────────────────────────────────────────────────
     def allowed(fn):
         return '.' in fn and fn.rsplit('.', 1)[-1].lower() \
