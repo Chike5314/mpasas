@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{% block title %}MPASAS{% endblock %} · MCQ Auto-Scoring</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/mpasas.css') }}"/>
+  {% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">M</div>
+      <div class="brand-text">
+        <strong>MPASAS</strong>
+        <small>MCQ Auto-Scoring &amp; Analytics</small>
+      </div>
+    </div>
+
+    <span class="nav-section-label">Main</span>
+    <a href="{{ url_for('index') }}"
+       class="nav-link {{ 'active' if request.endpoint == 'index' else '' }}">
+      <span class="nav-icon">🏠</span> Dashboard
+    </a>
+
+    <span class="nav-section-label">Setup</span>
+    <a href="{{ url_for('templates_list') }}"
+       class="nav-link {{ 'active' if 'template' in (request.endpoint or '') else '' }}">
+      <span class="nav-icon">📄</span> Templates
+    </a>
+    <a href="{{ url_for('new_template') }}"
+       class="nav-link {{ 'active' if request.endpoint == 'new_template' else '' }}">
+      <span class="nav-icon">➕</span> New Template
+    </a>
+
+    <span class="nav-section-label">Grading</span>
+    <a href="{{ url_for('sessions_list') }}"
+       class="nav-link {{ 'active' if request.endpoint == 'sessions_list' else '' }}">
+      <span class="nav-icon">📋</span> All Sessions
+    </a>
+    <a href="{{ url_for('new_session') }}"
+       class="nav-link {{ 'active' if request.endpoint == 'new_session' else '' }}">
+      <span class="nav-icon">🚀</span> Grade Scripts
+    </a>
+
+    <span class="nav-section-label">Tools</span>
+    <a href="{{ url_for('fast_template_page') }}"
+       class="nav-link {{ 'active' if request.endpoint == 'fast_template_page' else '' }}">
+      <span class="nav-icon">⚡</span> Fast-Print Sheet
+    </a>
+
+    <div class="sidebar-footer">
+      MPASAS v1.0 &nbsp;·&nbsp; Made in 🇨🇲 Cameroon
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">{% block page_title %}{% endblock %}</span>
+      <span class="topbar-tagline">Grade Smarter. Evaluate Better.</span>
+    </div>
+
+    <div class="content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">
+                {{ '✅' if category == 'success' else '❌' if category == 'error' else 'ℹ️' }}
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

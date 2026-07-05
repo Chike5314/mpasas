@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <h1>Welcome to MPASAS 🎓</h1>
+  <p>MCQ Paper-based Automatic Scoring and Analytics System — turn any smartphone photo of an answer sheet into structured data and deep insights.</p>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card primary">
+    <span class="stat-label">Templates</span>
+    <span class="stat-value">{{ templates | length }}</span>
+    <span class="stat-sub">answer-sheet layouts</span>
+  </div>
+  <div class="stat-card secondary">
+    <span class="stat-label">Grading Sessions</span>
+    <span class="stat-value">{{ sessions | length }}</span>
+    <span class="stat-sub">recent sessions shown</span>
+  </div>
+  <div class="stat-card emerald">
+    <span class="stat-label">Scripts Graded</span>
+    <span class="stat-value">{{ total_graded }}</span>
+    <span class="stat-sub">total across all sessions</span>
+  </div>
+  <div class="stat-card amber">
+    <span class="stat-label">CV Pipeline</span>
+    <span class="stat-value">ORB</span>
+    <span class="stat-sub">Homography + Pixel Density</span>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">⚡ Quick Actions</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <a href="{{ url_for('new_template') }}" class="btn btn-primary btn-lg">
+        📄 Create Template
+      </a>
+      <a href="{{ url_for('new_session') }}" class="btn btn-emerald btn-lg">
+        🚀 Grade Scripts
+      </a>
+      <a href="{{ url_for('sessions_list') }}" class="btn btn-secondary btn-lg">
+        📊 View Analytics
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- How it works -->
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">🔬 How the Pipeline Works</span>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;">
+      <div style="text-align:center;padding:16px;">
+        <div style="font-size:36px;margin-bottom:10px;">📐</div>
+        <div style="font-weight:700;color:var(--primary);margin-bottom:6px;">1. Calibrate</div>
+        <div style="font-size:13px;color:var(--muted);">Upload your blank answer sheet and draw zones for names and answer bubbles using the interactive editor.</div>
+      </div>
+      <div style="text-align:center;padding:16px;">
+        <div style="font-size:36px;margin-bottom:10px;">🔭</div>
+        <div style="font-weight:700;color:var(--secondary);margin-bottom:6px;">2. Align</div>
+        <div style="font-size:13px;color:var(--muted);">ORB feature matching + Homography automatically straightens each photo — handles angles, shadows and poor lighting.</div>
+      </div>
+      <div style="text-align:center;padding:16px;">
+        <div style="font-size:36px;margin-bottom:10px;">🔍</div>
+        <div style="font-weight:700;color:var(--accent);margin-bottom:6px;">3. Extract</div>
+        <div style="font-size:13px;color:var(--muted);">Pixel-density analysis scans every bubble cell and detects which option the student filled in.</div>
+      </div>
+      <div style="text-align:center;padding:16px;">
+        <div style="font-size:36px;margin-bottom:10px;">📊</div>
+        <div style="font-weight:700;color:var(--emerald);margin-bottom:6px;">4. Analyse</div>
+        <div style="font-size:13px;color:var(--muted);">Get scores, pass rates, difficulty indices, discrimination indices and export to CSV or Excel instantly.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent sessions -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">🕒 Recent Sessions</span>
+    <a href="{{ url_for('sessions_list') }}" class="btn btn-secondary btn-sm">View All</a>
+  </div>
+  {% if sessions %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Session</th><th>Template</th><th>Scripts</th>
+          <th>Avg %</th><th>Pass Rate</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in sessions %}
+        <tr>
+          <td><strong>{{ s.name }}</strong><br><span class="text-muted">{{ s.created_at.strftime('%d %b %Y') }}</span></td>
+          <td>{{ s.template.name if s.template else '—' }}</td>
+          <td>{{ s.processed }}/{{ s.total_scripts }}</td>
+          <td><strong>{{ s.average_score }}%</strong></td>
+          <td>{{ s.pass_rate }}%</td>
+          <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+          <td>
+            <a href="{{ url_for('results', session_id=s.id) }}" class="btn btn-primary btn-sm">Results</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-state-icon">📭</span>
+    <h3>No sessions yet</h3>
+    <p>Create a template first, then start a grading session to see results here.</p>
+    <a href="{{ url_for('new_template') }}" class="btn btn-primary">Get Started</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

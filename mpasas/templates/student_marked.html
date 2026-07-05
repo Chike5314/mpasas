@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Marked Script · {{ result.student_name }}{% endblock %}
+{% block page_title %}Marked Script · {{ result.student_name }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <span class="text-muted">Session: <strong>{{ session.name }}</strong></span>
+    &nbsp;·&nbsp;
+    <span class="text-muted">Template: <strong>{{ template.name if template else '—' }}</strong></span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{{ url_for('view_student_report', session_id=session.id, result_id=result.id) }}"
+       class="btn btn-primary">📋 Score Report</a>
+    <a href="{{ url_for('results', session_id=session.id) }}" class="btn btn-secondary">← Results</a>
+  </div>
+</div>
+
+<!-- Score summary bar -->
+<div class="card mb-20" style="border-left:4px solid {{ 'var(--emerald)' if result.passed else 'var(--red)' }};">
+  <div class="card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:16px 22px;">
+    <div>
+      <div class="stat-label">Student</div>
+      <div style="font-size:20px;font-weight:800;">{{ result.student_name }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Score</div>
+      <div style="font-size:20px;font-weight:800;">{{ result.score|int }}/{{ result.total }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Percentage</div>
+      <div style="font-size:20px;font-weight:800;color:{{ 'var(--emerald)' if result.passed else 'var(--red)' }};">
+        {{ result.percentage | round(1) }}%
+      </div>
+    </div>
+    <div>
+      <span class="badge {{ 'badge-pass' if result.passed else 'badge-fail' }}" style="font-size:14px;padding:6px 14px;">
+        {{ 'PASS ✓' if result.passed else 'FAIL ✗' }}
+      </span>
+    </div>
+    <div class="mt-auto text-muted text-sm" style="margin-left:auto;">{{ align_note }}</div>
+  </div>
+</div>
+
+<!-- Colour legend -->
+<div class="card mb-20">
+  <div class="card-body" style="display:flex;gap:24px;align-items:center;padding:14px 22px;flex-wrap:wrap;">
+    <span style="font-weight:700;font-size:13px;">Legend:</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="width:18px;height:18px;border-radius:50%;background:#22C55E;display:inline-block;"></span>
+      <span class="text-sm">Correct answer</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="width:18px;height:18px;border-radius:50%;background:#EF4444;display:inline-block;"></span>
+      <span class="text-sm">Wrong answer</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="width:18px;height:18px;border-radius:50%;background:transparent;border:3px solid #F59E0B;display:inline-block;"></span>
+      <span class="text-sm">Key answer (correct bubble)</span>
+    </span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="width:18px;height:18px;border-radius:50%;background:#94A3B8;display:inline-block;"></span>
+      <span class="text-sm">Not marked / blank</span>
+    </span>
+  </div>
+</div>
+
+<!-- Annotated image -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">📸 Annotated Answer Sheet</span>
+    {% if img_b64 %}
+    <a href="data:image/jpeg;base64,{{ img_b64 }}" download="marked_{{ result.student_name }}.jpg"
+       class="btn btn-emerald btn-sm">⬇️ Download Image</a>
+    {% endif %}
+  </div>
+  <div class="card-body" style="padding:16px;text-align:center;background:#F8FAFC;">
+    {% if img_b64 %}
+      <img src="data:image/jpeg;base64,{{ img_b64 }}"
+           style="max-width:100%;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);"
+           alt="Marked script for {{ result.student_name }}"/>
+    {% else %}
+      <div class="empty-state">
+        <span class="empty-state-icon">🖼️</span>
+        <h3>Image not available</h3>
+        <p>{{ align_note or 'The script image could not be found or processed.' }}</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Per-question answer table (quick reference) -->
+{% if result.raw_answers %}
+<div class="card" style="margin-top:20px;">
+  <div class="card-header">
+    <span class="card-title">🔍 Answer Reference</span>
+    <span class="text-muted text-sm">Green = correct · Red = wrong · — = blank</span>
+  </div>
+  <div class="card-body" style="padding:12px 20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      {% for q, ans in result.raw_answers.items() | sort(attribute='0') %}
+        {% set key_ans = key.get(q, '') %}
+        {% if ans and ans.upper() == key_ans.upper() %}
+          <span style="padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;
+                background:#D1FAE5;color:#065F46;min-width:54px;text-align:center;">
+            {{ q }}: {{ ans }}
+          </span>
+        {% elif ans %}
+          <span style="padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;
+                background:#FEE2E2;color:#991B1B;min-width:54px;text-align:center;"
+                title="Key: {{ key_ans }}">
+            {{ q }}: {{ ans }}
+          </span>
+        {% else %}
+          <span style="padding:4px 10px;border-radius:6px;font-size:12px;font-weight:500;
+                background:var(--bg);color:var(--muted);min-width:54px;text-align:center;">
+            {{ q }}: —
+          </span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

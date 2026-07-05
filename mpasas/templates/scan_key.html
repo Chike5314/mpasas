@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Scan Answer Key · {{ template.name }}{% endblock %}
+{% block page_title %}Answer Key · {{ template.name }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <p class="text-muted">Upload a photo of a filled marking guide, or enter the key digitally.</p>
+  <a href="{{ url_for('calibrate', tid=template.id) }}" class="btn btn-secondary">← Back to Calibration</a>
+</div>
+
+<!-- Mode tabs -->
+<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;" id="modeTabs">
+  <button onclick="showTab('photo')" id="tabPhoto"
+          style="padding:10px 22px;font-size:13px;font-weight:700;border:none;
+                 background:none;cursor:pointer;border-bottom:3px solid var(--primary);
+                 color:var(--primary);margin-bottom:-2px;">
+    📸 Scan from Photo
+  </button>
+  <button onclick="showTab('digital')" id="tabDigital"
+          style="padding:10px 22px;font-size:13px;font-weight:700;border:none;
+                 background:none;cursor:pointer;border-bottom:3px solid transparent;
+                 color:var(--muted);margin-bottom:-2px;">
+    ⌨️ Enter Digitally
+  </button>
+</div>
+
+<!-- ── PHOTO TAB ─────────────────────────────────────────────── -->
+<div id="panePhoto">
+  {% if not scanned_key %}
+  <!-- Upload form -->
+  <div style="max-width:580px;">
+    <div class="card mb-20" style="border-left:4px solid var(--cyan);">
+      <div class="card-body">
+        <div style="font-weight:700;margin-bottom:8px;color:var(--cyan);">📌 How to use photo scanning</div>
+        <ul style="font-size:13px;color:var(--muted);padding-left:18px;line-height:1.9;">
+          <li>Fill in <strong>only the correct answers</strong> on a blank answer sheet</li>
+          <li>Take a clear, flat photo — good lighting, minimal shadows</li>
+          <li>The system will extract the answers and show them for verification</li>
+          <li>You can edit any mistakes before saving</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📷 Upload Marking Guide Photo</span></div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="scan"/>
+          <div class="form-group">
+            <div class="dropzone" id="dropzone" onclick="document.getElementById('keyFile').click()">
+              <span class="dropzone-icon">📄</span>
+              <p><strong>Click to upload</strong> the filled answer sheet</p>
+              <p id="fname" style="margin-top:8px;font-weight:700;color:var(--primary);"></p>
+            </div>
+            <input type="file" id="keyFile" name="key_image"
+                   accept=".jpg,.jpeg,.png,.webp,.bmp" style="display:none"/>
+          </div>
+          <button class="btn btn-primary btn-lg" type="submit">🔍 Scan &amp; Extract Answers</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- Scan result + editor -->
+  <div class="card mb-20" style="border-left:4px solid {{ 'var(--emerald)' if not warnings else 'var(--accent)' }};">
+    <div class="card-body">
+      <div style="font-weight:700;margin-bottom:6px;">
+        {{ '✅ Scan complete' if not warnings else '⚠️ Scan complete with warnings' }}
+        &nbsp;·&nbsp; <span class="text-muted text-sm">{{ align_note }}</span>
+      </div>
+      {% if warnings %}
+      <div style="font-size:12px;color:var(--accent);">
+        {% for w in warnings %}<div>• {{ w }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      <div style="font-size:13px;color:var(--muted);margin-top:6px;">
+        Review and edit the extracted answers below, then click <strong>Save Key</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+
+    <!-- Preview image -->
+    {% if preview_b64 %}
+    <div style="flex:1;min-width:280px;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">📸 Scanned Preview</span>
+          <span class="text-muted text-sm">Amber = detected answer</span>
+        </div>
+        <div class="card-body" style="padding:10px;text-align:center;background:#F8FAFC;">
+          <img src="data:image/jpeg;base64,{{ preview_b64 }}"
+               style="max-width:100%;border-radius:8px;" alt="key scan preview"/>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Editable answer key -->
+    <div style="flex:1;min-width:280px;">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🔑 Extracted Key — Verify &amp; Edit</span>
+        </div>
+        <div class="card-body">
+          <form method="post" id="saveKeyForm">
+            <input type="hidden" name="action" value="save"/>
+            <input type="hidden" name="answer_key_json" id="keyJsonOut"
+                   value="{{ scanned_key_json }}"/>
+
+            <div id="keyEditor" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:460px;overflow-y:auto;padding:4px;">
+              {% for q in scanned_key.keys() | sort(attribute=lambda x: int(x[1:]) if x[1:].isdigit() else 0) %}
+              {% set ans = scanned_key[q] %}
+              <div class="answer-key-row">
+                <label>{{ q }}</label>
+                {% for lbl in ['A','B','C','D','E'] %}
+                <button type="button"
+                        class="answer-btn {{ 'selected' if ans == lbl else '' }}"
+                        data-q="{{ q }}" data-lbl="{{ lbl }}"
+                        onclick="selectKey(this,'{{ q }}','{{ lbl }}')">{{ lbl }}</button>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-lg" type="submit" onclick="serializeKey()">
+                💾 Save Answer Key
+              </button>
+              <a href="{{ url_for('scan_answer_key', tid=template.id) }}"
+                 class="btn btn-secondary">🔄 Rescan</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── DIGITAL TAB ────────────────────────────────────────────── -->
+<div id="paneDigital" style="display:none;">
+  <div style="max-width:640px;">
+    <div class="card">
+      <div class="card-header"><span class="card-title">⌨️ Enter Answer Key Digitally</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+          <label style="font-size:13px;font-weight:600;">Questions:</label>
+          <input id="dTotalQ" type="number" min="1" max="300" value="20"
+                 class="form-input" style="width:80px;"/>
+          <label style="font-size:13px;font-weight:600;">Options:</label>
+          <select id="dOpts" class="form-select" style="width:140px;">
+            <option value="4">4 (A–D)</option>
+            <option value="5" selected>5 (A–E)</option>
+          </select>
+          <button class="btn btn-secondary" onclick="buildDigitalGrid()">Build Grid</button>
+        </div>
+        <div id="digitalGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:460px;overflow-y:auto;padding:4px;"></div>
+        <form method="post" id="digitalForm" style="margin-top:16px;">
+          <input type="hidden" name="action" value="save"/>
+          <input type="hidden" name="answer_key_json" id="digitalKeyJson" value="{}"/>
+          <button class="btn btn-primary btn-lg" type="submit" onclick="serializeDigital()">
+            💾 Save Answer Key
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tab switching ─────────────────────────────────────────────────
+function showTab(name) {
+  document.getElementById('panePhoto').style.display   = name==='photo'   ? '' : 'none';
+  document.getElementById('paneDigital').style.display = name==='digital' ? '' : 'none';
+  const active   = 'border-bottom:3px solid var(--primary);color:var(--primary);margin-bottom:-2px;';
+  const inactive = 'border-bottom:3px solid transparent;color:var(--muted);margin-bottom:-2px;';
+  document.getElementById('tabPhoto').style.cssText   += name==='photo'   ? active : inactive;
+  document.getElementById('tabDigital').style.cssText += name==='digital' ? active : inactive;
+}
+
+// ── Dropzone ──────────────────────────────────────────────────────
+const fi = document.getElementById('keyFile');
+const dz = document.getElementById('dropzone');
+if (fi) {
+  fi.addEventListener('change', () => {
+    if (fi.files[0]) document.getElementById('fname').textContent = '✅ ' + fi.files[0].name;
+  });
+  if (dz) {
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault(); dz.classList.remove('drag-over');
+      const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]);
+      fi.files = dt.files;
+      document.getElementById('fname').textContent = '✅ ' + e.dataTransfer.files[0].name;
+    });
+  }
+}
+
+// ── Scan key editor ───────────────────────────────────────────────
+let editedKey = {};
+try { editedKey = JSON.parse(document.getElementById('keyJsonOut')?.value || '{}'); } catch(e){}
+
+function selectKey(btn, q, lbl) {
+  btn.closest('.answer-key-row').querySelectorAll('.answer-btn')
+     .forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  editedKey[q] = lbl;
+}
+function serializeKey() {
+  document.getElementById('keyJsonOut').value = JSON.stringify(editedKey);
+}
+
+// ── Digital key editor ────────────────────────────────────────────
+let digitalKey = {};
+function buildDigitalGrid() {
+  const total = parseInt(document.getElementById('dTotalQ').value) || 20;
+  const opts  = parseInt(document.getElementById('dOpts').value) || 5;
+  const lbls  = ['A','B','C','D','E','F'].slice(0, opts);
+  let html = '';
+  for (let i = 1; i <= total; i++) {
+    const q = 'Q' + i;
+    html += `<div class="answer-key-row"><label>${q}</label>`;
+    lbls.forEach(l => {
+      const sel = digitalKey[q] === l ? 'selected' : '';
+      html += `<button type="button" class="answer-btn ${sel}"
+                       data-q="${q}" data-l="${l}"
+                       onclick="selectDigital('${q}','${l}',this)">${l}</button>`;
+    });
+    html += '</div>';
+  }
+  document.getElementById('digitalGrid').innerHTML = html;
+}
+function selectDigital(q, lbl, btn) {
+  digitalKey[q] = lbl;
+  btn.closest('.answer-key-row').querySelectorAll('.answer-btn')
+     .forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+function serializeDigital() {
+  document.getElementById('digitalKeyJson').value = JSON.stringify(digitalKey);
+}
+
+// Build on load
+window.addEventListener('load', () => {
+  buildDigitalGrid();
+  // If we're on photo tab and a scanned key exists, activate it
+  {% if scanned_key %}
+  showTab('photo');
+  {% endif %}
+});
+</script>
+{% endblock %}
