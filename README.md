@@ -10,7 +10,7 @@
 
 MPASAS is a **computer-vision-powered web application** that turns smartphone photos of MCQ answer sheets into structured scores and analytics — no special hardware, no proprietary forms, no internet required after setup.
 
-Supports **single-page sheets (20 questions) up to multi-zone layouts (50+ questions)** — perfect for standardized tests like KC STEM Olympiad.
+Supports **single-page sheets (20 questions) up to multi-zone layouts (50+ questions)** — perfect for large-scale assessments and standardized tests.
 
 | Stage | Technology | What happens |
 |-------|-----------|-------------|
@@ -105,7 +105,7 @@ The test suite covers:
 
 **Examples:**
 - **Standard sheet**: 1 zone, 20 rows, 5 columns → Q1–Q20
-- **KC STEM Olympiad**: 2 zones, 25 rows each, 5 columns → Q1–Q50 (Q1–Q25 zone 1, Q26–Q50 zone 2)
+- **Large assessment**: 2 zones, 25 rows each, 5 columns → Q1–Q50 (Q1–Q25 zone 1, Q26–Q50 zone 2)
 
 ### Step 3 — Grade Scripts
 1. Go to **Grade Scripts → New Session**
@@ -205,15 +205,15 @@ static/charts/
 
 MPASAS now handles standardized test sheets with 50+ questions using **multi-zone calibration**:
 
-#### Example: KC STEM Olympiad (50 Questions)
-Your answer sheet has two columns. Calibrate it this way:
+#### Example: 50-Question Assessment with Two Columns
+For answer sheets with two columns (left/right layout). Calibrate it this way:
 
 | Attribute | Zone 1 (Left) | Zone 2 (Right) |
 |-----------|---------------|----------------|
 | Position | Left half of sheet | Right half of sheet |
-| Rows | 25 | 25 |
-| Columns | 5 (A–E) | 5 (A–E) |
-| Questions | Q1–Q25 | Q26–Q50 |
+| Rows | 25 questions | 25 questions |
+| Columns | 5 options (A–E) | 5 options (A–E) |
+| Question Range | Q1–Q25 | Q26–Q50 |
 
 The system automatically:
 - ✓ Extracts all 50 answers in one grading session
