@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Fast Template{% endblock %}
+{% block page_title %}Fast-Print Answer Sheet{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;">
+
+  <div class="hero" style="margin-bottom:24px;">
+    <h1>⚡ Fast-Print Template</h1>
+    <p>Generate a ready-to-print A4 answer sheet with <strong>corner registration marks</strong>. The system auto-detects the marks in student photos, so no manual zone drawing is needed.</p>
+  </div>
+
+  <!-- How it works -->
+  <div class="card mb-20">
+    <div class="card-header"><span class="card-title">🔬 How it works</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:20px;">
+        <div style="text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">⬇️</div>
+          <div style="font-weight:700;color:var(--primary);margin-bottom:4px;">1. Download &amp; Print</div>
+          <div style="font-size:12px;color:var(--muted);">Configure and download the sheet, print it out.</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">✏️</div>
+          <div style="font-weight:700;color:var(--secondary);margin-bottom:4px;">2. Students fill in</div>
+          <div style="font-size:12px;color:var(--muted);">Students write their name and fill bubbles as normal.</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">📸</div>
+          <div style="font-weight:700;color:var(--accent);margin-bottom:4px;">3. Photograph</div>
+          <div style="font-size:12px;color:var(--muted);">Take a photo with any smartphone. The L-corner marks correct the perspective automatically.</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">📊</div>
+          <div style="font-weight:700;color:var(--emerald);margin-bottom:4px;">4. Auto-grade</div>
+          <div style="font-size:12px;color:var(--muted);">Upload in a grading session — zones are pre-detected, no calibration drawing needed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registration mark explainer -->
+  <div class="card mb-20" style="border-left:4px solid var(--cyan);">
+    <div class="card-body" style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="font-size:48px;">⌐</div>
+      <div>
+        <div style="font-weight:700;margin-bottom:4px;color:var(--cyan);">What are registration marks?</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.8;">
+          The four <strong>L-shaped black corners</strong> printed on the sheet act like a GPS system for the camera.
+          Even if the photo is taken at an angle or the sheet is rotated, the system finds all 4 marks and computes
+          the exact homography transform to un-warp the image. No manual zone drawing required.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generator form -->
+  <div class="card mb-20">
+    <div class="card-header"><span class="card-title">⚙️ Configure Your Sheet</span></div>
+    <div class="card-body">
+      <form id="genForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Number of Questions</label>
+            <input class="form-input" type="number" id="fQ" name="questions"
+                   min="5" max="100" value="20"/>
+            <div class="form-hint">5 – 100 questions</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Options per Question</label>
+            <select class="form-select" id="fOpt" name="options">
+              <option value="4">4 options (A, B, C, D)</option>
+              <option value="5" selected>5 options (A, B, C, D, E)</option>
+              <option value="6">6 options (A – F)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Layout</label>
+            <select class="form-select" id="fCol" name="two_col">
+              <option value="true" selected>2 columns (recommended for &gt;10 Qs)</option>
+              <option value="false">Single column</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sheet Title</label>
+            <input class="form-input" type="text" id="fTitle" name="title"
+                   value="MPASAS Quick Answer Sheet" maxlength="60"/>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Preview placeholder -->
+  <div class="card mb-20" id="previewCard" style="display:none;">
+    <div class="card-header"><span class="card-title">👁️ Preview</span></div>
+    <div class="card-body" style="text-align:center;background:#F8FAFC;padding:16px;">
+      <img id="previewImg" style="max-width:100%;border-radius:8px;
+           box-shadow:0 4px 16px rgba(0,0,0,.15);" alt="template preview"/>
+    </div>
+  </div>
+
+  <!-- Action buttons -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-secondary btn-lg" onclick="previewTemplate()">👁️ Preview</button>
+    <button class="btn btn-emerald btn-lg" onclick="downloadTemplate()">⬇️ Download PNG</button>
+    <button class="btn btn-primary btn-lg" onclick="createAndCalibrate()">🚀 Create Template &amp; Calibrate</button>
+  </div>
+
+  <div class="text-muted" style="margin-top:12px;font-size:12px;">
+    <strong>Create Template &amp; Calibrate</strong> — saves the sheet into MPASAS with zones pre-configured.
+    You only need to set the answer key, then start grading.
+  </div>
+</div>
+
+<script>
+function getParams() {
+  return new URLSearchParams({
+    questions: document.getElementById('fQ').value,
+    options:   document.getElementById('fOpt').value,
+    two_col:   document.getElementById('fCol').value,
+    title:     document.getElementById('fTitle').value,
+  });
+}
+
+function previewTemplate() {
+  const p   = getParams();
+  const img = document.getElementById('previewImg');
+  img.src   = '/fast-template/download?' + p.toString();
+  document.getElementById('previewCard').style.display = '';
+  img.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function downloadTemplate() {
+  window.location.href = '/fast-template/download?' + getParams().toString();
+}
+
+function createAndCalibrate() {
+  window.location.href = '/fast-template/generate?' + getParams().toString();
+}
+</script>
+{% endblock %}

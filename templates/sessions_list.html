@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Grading Sessions{% endblock %}
+{% block page_title %}Grading Sessions{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;">
+  <div>
+    <h2 style="font-size:20px;font-weight:800;">All Sessions</h2>
+    <p class="text-muted">Each session is one batch of scripts graded against a template.</p>
+  </div>
+  <a href="{{ url_for('new_session') }}" class="btn btn-primary">🚀 Grade New Batch</a>
+</div>
+
+{% if sessions %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Session Name</th>
+          <th>Template</th>
+          <th>Date</th>
+          <th>Scripts</th>
+          <th>Average</th>
+          <th>Pass Rate</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in sessions %}
+        <tr>
+          <td><strong>{{ s.name }}</strong></td>
+          <td>{{ s.template.name if s.template else '—' }}</td>
+          <td>{{ s.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+          <td>{{ s.processed }}/{{ s.total_scripts }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="progress-bar-wrap" style="width:70px;">
+                <div class="progress-bar-fill" style="width:{{ s.average_score }}%;"></div>
+              </div>
+              <strong>{{ s.average_score }}%</strong>
+            </div>
+          </td>
+          <td>
+            <span style="color:{{ 'var(--emerald)' if s.pass_rate >= 50 else 'var(--red)' }};font-weight:700;">
+              {{ s.pass_rate }}%
+            </span>
+          </td>
+          <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="{{ url_for('results', session_id=s.id) }}" class="btn btn-primary btn-sm">📊 Results</a>
+              <a href="{{ url_for('export_csv', session_id=s.id) }}" class="btn btn-emerald btn-sm">⬇️ CSV</a>
+              <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}"
+                    onsubmit="return confirm('Delete session {{ s.name|e }}?')">
+                <button class="btn btn-red btn-sm" type="submit">🗑️</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <span class="empty-state-icon">📋</span>
+  <h3>No sessions yet</h3>
+  <p>Start a grading session by uploading student script photos. You'll need a calibrated template first.</p>
+  <a href="{{ url_for('new_session') }}" class="btn btn-primary">Grade First Batch</a>
+</div>
+{% endif %}
+{% endblock %}

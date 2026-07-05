@@ -1,4 +1,4 @@
- # MPASAS 🎓
+# MPASAS 🎓
 ### MCQ Paper-based Automatic Scoring and Analytics System
 
 > **"Grade Smarter. Evaluate Better."**
@@ -10,13 +10,11 @@
 
 MPASAS is a **computer-vision-powered web application** that turns smartphone photos of MCQ answer sheets into structured scores and analytics — no special hardware, no proprietary forms, no internet required after setup.
 
-Supports **single-page sheets (20 questions) up to multi-zone layouts (50+ questions)** — perfect for standardized tests like KC STEM Olympiad.
-
 | Stage | Technology | What happens |
 |-------|-----------|-------------|
-| **Calibrate** | Interactive canvas editor | Draw multiple zones on your answer sheet template once |
+| **Calibrate** | Interactive canvas editor | You draw zones on your answer sheet template once |
 | **Align** | ORB feature matching + Homography | Tilted/dark photos are automatically straightened |
-| **Extract** | Pixel density + adaptive thresholds | Filled bubbles detected reliably across all sheet sizes |
+| **Extract** | Pixel density analysis | Filled bubbles are detected per question |
 | **Analyse** | Difficulty + Discrimination indices | Charts, pass rates, distractor analysis |
 
 ---
@@ -55,7 +53,7 @@ Then open your browser at: **http://localhost:5000**
 ## Generate Demo / Test Data (no real scanner needed)
 
 ```bash
-python tests/generate_test_sheet.pypython tests/generate_test_sheet.py
+python tests/generate_test_sheet.py
 ```
 
 This creates:
@@ -92,20 +90,11 @@ The test suite covers:
 3. Click **Next: Calibrate Zones**
 
 ### Step 2 — Calibrate Zones
-1. Click **"Draw OMR Zone"** to define your bubble grid areas:
-   - **Single-zone sheets** (standard 20-question): Draw one box over the entire bubble grid
-   - **Multi-zone sheets** (50+ questions like KC STEM): Draw multiple zones (e.g., left column Q1-25, right column Q26-50)
-2. For each zone, enter:
-   - **Rows**: Number of questions in this zone
-   - **Columns**: Number of answer options (usually 5 for A–E)
-   - **Label**: Zone name (optional, e.g., "Left 25" or "Right 25")
+1. Click **"Draw OMR Zone"** and drag a box over the bubble grid
+2. Enter the number of rows (questions) and columns (options)
 3. Click **"Draw Name Zone"** and drag over the student name area
-4. Click **"Edit Answer Key"** and set the correct answer for each question (auto-numbered Q1, Q2, … across all zones)
+4. Click **"Edit Answer Key"** and set the correct answer for each question
 5. Click **"Save & Continue"**
-
-**Examples:**
-- **Standard sheet**: 1 zone, 20 rows, 5 columns → Q1–Q20
-- **KC STEM Olympiad**: 2 zones, 25 rows each, 5 columns → Q1–Q50 (Q1–Q25 zone 1, Q26–Q50 zone 2)
 
 ### Step 3 — Grade Scripts
 1. Go to **Grade Scripts → New Session**
@@ -199,45 +188,6 @@ static/charts/
 
 ---
 
-## Advanced Features
-
-### 📋 Large Sheet Support (50+ Questions)
-
-MPASAS now handles standardized test sheets with 50+ questions using **multi-zone calibration**:
-
-#### Example: KC STEM Olympiad (50 Questions)
-Your answer sheet has two columns. Calibrate it this way:
-
-| Attribute | Zone 1 (Left) | Zone 2 (Right) |
-|-----------|---------------|----------------|
-| Position | Left half of sheet | Right half of sheet |
-| Rows | 25 | 25 |
-| Columns | 5 (A–E) | 5 (A–E) |
-| Questions | Q1–Q25 | Q26–Q50 |
-
-The system automatically:
-- ✓ Extracts all 50 answers in one grading session
-- ✓ Numbers questions sequentially across zones (Q1 → Q50)
-- ✓ Applies adaptive fill thresholds for reliable detection on smaller bubbles
-- ✓ Flags ambiguous marks (multiple bubbles filled) to prevent scoring errors
-
-#### Multi-Zone Calibration Steps
-1. In **Calibrate** mode, click **"Draw OMR Zone"** for the **left column**
-2. Enter: Rows = 25, Columns = 5
-3. Click **"Draw OMR Zone"** again for the **right column**
-4. Enter: Rows = 25, Columns = 5
-5. Your zones are auto-numbered → grading will extract Q1–Q50 correctly
-
-### 🎯 Ambiguous Mark Handling
-
-When multiple bubbles are detected in a single question:
-- The system marks it as **"ambiguous"** (status: left ungraded)
-- It appears in the results but with **no assigned answer**
-- You can manually review and correct these in the results view
-- This ensures accuracy over blind automation
-
----
-
 ## Troubleshooting
 
 | Problem | Fix |
@@ -248,9 +198,6 @@ When multiple bubbles are detected in a single question:
 | White/blank canvas in calibrator | Upload the template image first |
 | Poor bubble detection | Improve lighting on photos; use the test generator to verify the pipeline |
 | Name extraction empty | Pytesseract is optional — name falls back to filename |
-| Large sheet shows ambiguous marks | This is expected for multi-zone sheets with tight spacing; manually review in results |
-| Not all 50 questions extracted | Verify both zones are calibrated correctly; check zone coordinates don't overlap |
-| Bubble sizes vary across sheet | System auto-adapts threshold based on cell size — no manual tuning needed |
 
 ---
 

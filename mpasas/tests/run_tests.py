@@ -199,41 +199,6 @@ def t_extractor_blank():
     assert all(r['status'] == 'blank' for r in result.values())
     return f"{len(result)} blank questions detected"
 
-@test("Extractor: ambiguous multi-marks are not auto-graded")
-def t_extractor_ambiguous():
-    import numpy as np, cv2
-    from modules.extractor import extract_all_answers
-    roi = np.ones((120, 200, 3), dtype=np.uint8) * 240
-    cv2.circle(roi, (50, 60), 12, (20, 20, 20), -1)
-    cv2.circle(roi, (150, 60), 12, (20, 20, 20), -1)
-    zones = [{'type': 'omr', 'rows': 1, 'cols': 2, 'labels': ['A', 'B'],
-              'xPct': 0.0, 'yPct': 0.0, 'wPct': 1.0, 'hPct': 1.0}]
-    result = extract_all_answers(roi, zones)
-    assert result['answers']['Q1'] is None
-    assert result['metadata']['Q1']['status'] == 'ambiguous'
-    return "ambiguous marks were left ungraded"
-
-@test("Extractor: large 50-question sheet (two zones of 25)")
-def t_extractor_large_sheet():
-    import numpy as np, cv2
-    from modules.extractor import extract_all_answers
-    roi_left = np.ones((400, 150, 3), dtype=np.uint8) * 240
-    roi_right = np.ones((400, 150, 3), dtype=np.uint8) * 240
-    for i in range(25):
-        cv2.circle(roi_left, (30 + (i % 5) * 30, 20 + (i // 5) * 15), 5, (20, 20, 20), -1)
-        cv2.circle(roi_right, (30 + (i % 5) * 30, 20 + (i // 5) * 15), 5, (20, 20, 20), -1)
-    zones = [
-        {'type': 'omr', 'rows': 25, 'cols': 5, 'labels': ['A','B','C','D','E'],
-         'xPct': 0.0, 'yPct': 0.0, 'wPct': 0.5, 'hPct': 1.0, 'name': 'Left 25'},
-        {'type': 'omr', 'rows': 25, 'cols': 5, 'labels': ['A','B','C','D','E'],
-         'xPct': 0.5, 'yPct': 0.0, 'wPct': 0.5, 'hPct': 1.0, 'name': 'Right 25'},
-    ]
-    combined = np.hstack([roi_left, roi_right])
-    result = extract_all_answers(combined, zones)
-    assert 'Q1' in result['answers'] and 'Q50' in result['answers']
-    assert len(result['answers']) == 50
-    return f"50 questions extracted (Q1 to Q50)"
-
 # ══════════════════════════════════════════════════════════════════
 #   Aligner
 # ══════════════════════════════════════════════════════════════════
